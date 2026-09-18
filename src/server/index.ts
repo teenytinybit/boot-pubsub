@@ -1,7 +1,13 @@
 import amqp from "amqplib";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import {
+  ExchangePerilDirect,
+  ExchangePerilTopic,
+  GameLogSlug,
+  PauseKey,
+} from "../internal/routing/routing.js";
+import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
 
 const connStr = "amqp://guest:guest@localhost:5672/";
 
@@ -12,6 +18,14 @@ async function main() {
 
   const channel = await connection.createConfirmChannel();
   console.log("Created confirm channel");
+
+  declareAndBind(
+    connection,
+    ExchangePerilTopic,
+    GameLogSlug,
+    `${GameLogSlug}.*`,
+    SimpleQueueType.Durable,
+  );
 
   process.on("SIGINT", () => {
     console.log("\nShutting down...");
