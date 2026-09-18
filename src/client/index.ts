@@ -11,6 +11,8 @@ import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
+import { subscribeJSON } from "../internal/pubsub/subscribe.js";
+import { handlerPause } from "./handlers.js";
 
 const connStr = "amqp://guest:guest@localhost:5672/";
 
@@ -28,12 +30,21 @@ async function main() {
   declareAndBind(
     connection,
     ExchangePerilDirect,
-    `pause.${username}`,
+    `${PauseKey}.${username}`,
     PauseKey,
     SimpleQueueType.Transient,
   );
 
   const state = new GameState(username);
+  await subscribeJSON(
+    connection,
+    ExchangePerilDirect,
+    `${PauseKey}.${username}`,
+    PauseKey,
+    SimpleQueueType.Transient,
+    handlerPause(state),
+  );
+
   while (true) {
     const inputArr = await getInput();
     if (inputArr.length) {
