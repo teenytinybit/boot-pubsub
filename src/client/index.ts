@@ -1,9 +1,16 @@
 import amqp from "amqplib";
-import { publishJSON } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
-import type { PlayingState } from "../internal/gamelogic/gamestate.js";
-import { clientWelcome } from "../internal/gamelogic/gamelogic.js";
+import {
+  clientWelcome,
+  commandStatus,
+  getInput,
+  printClientHelp,
+  printQuit,
+} from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
+import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { GameState } from "../internal/gamelogic/gamestate.js";
+import { commandSpawn } from "../internal/gamelogic/spawn.js";
+import { commandMove } from "../internal/gamelogic/move.js";
 
 const connStr = "amqp://guest:guest@localhost:5672/";
 
@@ -25,6 +32,40 @@ async function main() {
     PauseKey,
     SimpleQueueType.Transient,
   );
+
+  const state = new GameState(username);
+  while (true) {
+    const inputArr = await getInput();
+    if (inputArr.length) {
+      const command = inputArr[0];
+      // spawn, move, status, help, spam, quit
+      if (command === "spawn") {
+        try {
+          commandSpawn(state, inputArr);
+        } catch (error) {
+          console.log(error);
+        }
+      } else if (command === "move") {
+        try {
+          commandMove(state, inputArr);
+          console.log("Move successful!");
+        } catch (error) {
+          console.log(error);
+        }
+      } else if (command === "status") {
+        commandStatus(state);
+      } else if (command === "spam") {
+        console.log("Spamming not allowed yet!");
+      } else if (command === "quit") {
+        printQuit();
+        process.exit(0);
+      } else if (command === "help") {
+        printClientHelp();
+      } else {
+        console.log("Invalid command!");
+      }
+    }
+  }
 }
 
 main().catch((err) => {
