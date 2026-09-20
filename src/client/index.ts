@@ -7,12 +7,18 @@ import {
   printQuit,
 } from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import {
+  ArmyMovesPrefix,
+  ExchangePerilDirect,
+  ExchangePerilTopic,
+  PauseKey,
+} from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { subscribeJSON } from "../internal/pubsub/subscribe.js";
-import { handlerPause } from "./handlers.js";
+import { handlerMove, handlerPause } from "./handlers.js";
+import { publishJSON } from "../internal/pubsub/publish.js";
 
 const connStr = "amqp://guest:guest@localhost:5672/";
 
@@ -21,21 +27,24 @@ async function main() {
   const connection = await amqp.connect(connStr);
   console.log("Connected to RabbitMQ");
 
+  const channel = await connection.createConfirmChannel();
+  console.log("Created user channel");
+
   process.on("SIGINT", () => {
     console.log("Shutting down...");
     connection.close();
   });
 
   const username = await clientWelcome();
-  declareAndBind(
+  const state = new GameState(username);
+
+  await declareAndBind(
     connection,
     ExchangePerilDirect,
     `${PauseKey}.${username}`,
     PauseKey,
     SimpleQueueType.Transient,
   );
-
-  const state = new GameState(username);
   await subscribeJSON(
     connection,
     ExchangePerilDirect,
@@ -43,6 +52,22 @@ async function main() {
     PauseKey,
     SimpleQueueType.Transient,
     handlerPause(state),
+  );
+
+  await declareAndBind(
+    connection,
+    ExchangePerilTopic,
+    `${ArmyMovesPrefix}.${username}`,
+    `${ArmyMovesPrefix}.*`,
+    SimpleQueueType.Transient,
+  );
+  await subscribeJSON(
+    connection,
+    ExchangePerilTopic,
+    `${ArmyMovesPrefix}.${username}`,
+    `${ArmyMovesPrefix}.*`,
+    SimpleQueueType.Transient,
+    handlerMove(state),
   );
 
   while (true) {
@@ -58,8 +83,10 @@ async function main() {
         }
       } else if (command === "move") {
         try {
-          commandMove(state, inputArr);
+          const mv = commandMove(state, inputArr);
           console.log("Move successful!");
+          await publishJSON(channel, ExchangePerilTopic, `${ArmyMovesPrefix}.${username}`, mv);
+          console.log("The move has been published.");
         } catch (error) {
           console.log(error);
         }
