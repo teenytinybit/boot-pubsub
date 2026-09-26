@@ -1,4 +1,5 @@
 import amqp, { type Channel } from "amqplib";
+import { DeadLetterExchange } from "../routing/routing.js";
 
 export enum SimpleQueueType {
   Durable,
@@ -18,6 +19,7 @@ export async function declareAndBind(
     durable: queueType === SimpleQueueType.Durable,
     autoDelete: queueType === SimpleQueueType.Transient,
     exclusive: queueType === SimpleQueueType.Transient,
+    arguments: { "x-dead-letter-exchange": DeadLetterExchange },
   });
 
   await channel.bindQueue(queueName, exchange, key);

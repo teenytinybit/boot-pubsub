@@ -5,3 +5,6 @@ export const GameLogSlug = "game_logs";
 
 export const ExchangePerilDirect = "peril_direct";
 export const ExchangePerilTopic = "peril_topic";
+
+export const DeadLetterExchange = "peril_dlx";
+export const DeadLetterQueue = "peril_dlq";
