@@ -19,7 +19,7 @@ async function main() {
   const channel = await connection.createConfirmChannel();
   console.log("Created confirm channel");
 
-  declareAndBind(
+  await declareAndBind(
     connection,
     ExchangePerilTopic,
     GameLogSlug,

@@ -13,21 +13,16 @@ export async function subscribeJSON<T>(
   queueName: string,
   key: string,
   queueType: SimpleQueueType,
-  handler: (data: T) => AckType,
+  handler: (data: T) => Promise<AckType> | AckType,
 ): Promise<void> {
   const [channel, q] = await declareAndBind(conn, exchange, queueName, key, queueType);
 
-  await channel.consume(q.queue, (msg) => {
-    if (msg) {
-      let data;
-      try {
-        data = JSON.parse(msg.content.toString());
-      } catch (error) {
-        console.log(error);
-        return;
-      }
+  await channel.consume(q.queue, async (msg) => {
+    if (!msg) return;
 
-      const ackType = handler(data);
+    try {
+      const data = JSON.parse(msg.content.toString());
+      const ackType = await handler(data);
       console.log("Acking message...Ack type: ", ackType);
       if (ackType === "Ack") {
         channel.ack(msg);
@@ -39,6 +34,9 @@ export async function subscribeJSON<T>(
         channel.nack(msg, false, false);
         console.log("Message discarded.");
       }
+    } catch (error) {
+      console.log(error);
+      return;
     }
   });
 }
